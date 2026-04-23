@@ -10,18 +10,11 @@ let
     mkOption
     mkEnableOption
     mkIf
-    mkMerge
     types
     optionalAttrs
     ;
 
   tomlFormat = pkgs.formats.toml { };
-
-  # Combine all plugin derivations into a single tree.
-  combined = pkgs.buildEnv {
-    name = "codex-nix-plugins";
-    paths = cfg.plugins;
-  };
 
   # Collect hooks from every plugin's _codex.hooks passthru and group them
   # by event then matcher.
@@ -176,10 +169,5 @@ in
       ''}
     '';
 
-    home.file = mkMerge [
-      (mkIf (builtins.pathExists "${combined}/skills") {
-        ".agents/skills".source = "${combined}/skills";
-      })
-    ];
   };
 }
