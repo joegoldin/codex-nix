@@ -51,9 +51,12 @@ let
 
   collectedAgents = collectAgents cfg.plugins;
 
-  # Merge settings with collected MCP servers.
+  # User top-level servers win over plugin-collected ones on a name conflict.
+  allMcpServers = collectedMcpServers // cfg.mcpServers;
+
+  # Merge settings with all MCP servers (plugins + user option).
   mergedSettings = lib.recursiveUpdate cfg.settings (
-    optionalAttrs (collectedMcpServers != { }) { mcp_servers = collectedMcpServers; }
+    optionalAttrs (allMcpServers != { }) { mcp_servers = allMcpServers; }
   );
 
   # Generate config TOML file.
@@ -90,6 +93,31 @@ in
       description = ''
         Contents of `~/.codex/config.toml`. MCP servers collected from
         `plugins` are merged on top of this attrset.
+      '';
+    };
+
+    mcpServers = mkOption {
+      type = types.attrsOf types.attrs;
+      default = { };
+      example = lib.literalExpression ''
+        {
+          context7 = {
+            command = "npx";
+            args = [ "-y" "@upstash/context7-mcp" ];
+          };
+          figma = {
+            url = "https://mcp.figma.com/mcp";
+            bearer_token_env_var = "FIGMA_OAUTH_TOKEN";
+          };
+        }
+      '';
+      description = ''
+        Top-level MCP servers, merged into the `[mcp_servers.*]` tables of
+        `~/.codex/config.toml` alongside any plugin-provided servers (the
+        user option wins on a name conflict). Values use Codex's native shape:
+        stdio `{ command; args?; env?; }` or remote
+        `{ url; bearer_token_env_var?; http_headers?; }` (never a raw
+        `bearer_token` — Codex rejects it).
       '';
     };
 
