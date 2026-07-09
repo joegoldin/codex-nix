@@ -63,7 +63,14 @@ let
     };
 
   # ─── mkAgent ──────────────────────────────────────────────
-  # Produces $out/agents/<name>.toml using pkgs.formats.toml.
+  # Produces $out/agents/<name>.toml — the "config layer" a role's
+  # `[agents.<name>].config_file` points at. Codex discovers custom agent
+  # roles via `[agents.<name>]` tables in config.toml (description +
+  # config_file), NOT by scanning ~/.codex/agents, so the home-manager module
+  # reads the passthru below to emit that table. The TOML written here is the
+  # overlay config for the role and must contain only valid top-level config
+  # keys — `description` and `nickname_candidates` belong to the [agents.<name>]
+  # table and are therefore excluded from the layer and surfaced via passthru.
   mkAgent =
     {
       name,
@@ -79,21 +86,32 @@ let
     let
       tomlFormat = pkgs.formats.toml { };
       payload =
-        (removeAttrs args [ "name" ])
+        (removeAttrs args [
+          "name"
+          "description"
+          "nickname_candidates"
+        ])
         // {
-          inherit description developer_instructions;
+          inherit developer_instructions;
         }
         // optionalAttrs (model != null) { inherit model; }
         // optionalAttrs (sandbox_mode != null) { inherit sandbox_mode; }
         // optionalAttrs (mcp_servers != null) { inherit mcp_servers; }
-        // optionalAttrs (nickname_candidates != null) { inherit nickname_candidates; }
         // optionalAttrs (skills_config != null) { inherit skills_config; };
       tomlFile = tomlFormat.generate "codex-agent-${name}.toml" payload;
     in
-    pkgs.runCommand "codex-agent-${name}" { } ''
-      mkdir -p $out/agents
-      cp ${tomlFile} $out/agents/${name}.toml
-    '';
+    pkgs.runCommand "codex-agent-${name}"
+      {
+        passthru = {
+          agentName = name;
+          agentDescription = description;
+        }
+        // optionalAttrs (nickname_candidates != null) { agentNicknames = nickname_candidates; };
+      }
+      ''
+        mkdir -p $out/agents
+        cp ${tomlFile} $out/agents/${name}.toml
+      '';
 
   # ─── mkPlugin ─────────────────────────────────────────────
   # Bundles skill and agent derivations into one buildEnv tree.

@@ -51,12 +51,29 @@ let
 
   collectedAgents = collectAgents cfg.plugins;
 
+  # Register each collected agent as a Codex role: `[agents.<name>]` with a
+  # description (role guidance for the orchestrator) and a config_file pointing
+  # at the TOML copied into ~/.codex/agents/. Codex only discovers custom roles
+  # through these tables — the TOML files are not auto-scanned. Name/description
+  # ride on the agent derivation's passthru (see codex-nix lib mkAgent).
+  agentRoles = lib.listToAttrs (
+    map (a: {
+      name = a.agentName;
+      value = {
+        description = a.agentDescription or "";
+        config_file = "${config.home.homeDirectory}/.codex/agents/${a.agentName}.toml";
+      }
+      // lib.optionalAttrs (a ? agentNicknames) { nickname_candidates = a.agentNicknames; };
+    }) collectedAgents
+  );
+
   # User top-level servers win over plugin-collected ones on a name conflict.
   allMcpServers = collectedMcpServers // cfg.mcpServers;
 
-  # Merge settings with all MCP servers (plugins + user option).
+  # Merge settings with all MCP servers (plugins + user option) and agent roles.
   mergedSettings = lib.recursiveUpdate cfg.settings (
-    optionalAttrs (allMcpServers != { }) { mcp_servers = allMcpServers; }
+    (optionalAttrs (allMcpServers != { }) { mcp_servers = allMcpServers; })
+    // (optionalAttrs (agentRoles != { }) { agents = agentRoles; })
   );
 
   # Generate config TOML file.
