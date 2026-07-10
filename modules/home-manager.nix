@@ -38,16 +38,12 @@ let
   collectedHooks = collectHooks cfg.plugins;
 
   # Collect MCP servers from all plugins.
-  collectMcpServers =
-    plugins:
-    lib.foldl' (acc: p: acc // (p._codex.mcpServers or { })) { } plugins;
+  collectMcpServers = plugins: lib.foldl' (acc: p: acc // (p._codex.mcpServers or { })) { } plugins;
 
   collectedMcpServers = collectMcpServers cfg.plugins;
 
   # Collect agent derivations from all plugins.
-  collectAgents =
-    plugins:
-    lib.concatMap (p: p._codex.agents or [ ]) plugins;
+  collectAgents = plugins: lib.concatMap (p: p._codex.agents or [ ]) plugins;
 
   collectedAgents = collectAgents cfg.plugins;
 
@@ -197,10 +193,14 @@ in
       run chmod 600 "$hooksFile"
 
       # ── agent TOML files ──
+      # cp -f + chmod: a plain cp of a store file leaves the copy read-only
+      # (444), which makes every later activation's overwrite fail with
+      # "Permission denied".
       ${lib.concatMapStringsSep "\n" (agent: ''
         if [[ -d "${agent}/agents" ]]; then
           for f in ${agent}/agents/*.toml; do
-            run cp "$f" "$codexDir/agents/"
+            run cp -f "$f" "$codexDir/agents/"
+            run chmod 644 "$codexDir/agents/''${f##*/}"
           done
         fi
       '') collectedAgents}

@@ -18,15 +18,13 @@
           system:
           f {
             pkgs = import nixpkgs { inherit system; };
-            lib = nixpkgs.lib;
+            inherit (nixpkgs) lib;
             inherit system;
           }
         );
     in
     {
-      lib = forAllSystems (
-        { pkgs, lib, ... }: import ./lib { inherit pkgs lib; }
-      );
+      lib = forAllSystems ({ pkgs, lib, ... }: import ./lib { inherit pkgs lib; });
 
       homeManagerModules.default = import ./modules/home-manager.nix;
       homeManagerModules.codex-nix = import ./modules/home-manager.nix;
@@ -70,6 +68,21 @@
           };
 
           eval-plugin = import ./examples/example-plugin.nix { inherit pkgs lib; };
+
+          # Regression check for the agent-copy activation idiom: copying a
+          # read-only (store-mode) file must stay idempotent across repeated
+          # activations. Plain `cp` leaves a 444 copy that the next run cannot
+          # overwrite; the module uses `cp -f` + chmod (home-manager.nix).
+          agent-copy-idempotent = pkgs.runCommand "check-agent-copy-idempotent" { } ''
+            echo 'description = "smoke"' > src.toml
+            chmod 444 src.toml
+            mkdir dest
+            for i in 1 2; do
+              cp -f src.toml dest/
+              chmod 644 dest/src.toml
+            done
+            touch $out
+          '';
         }
       );
     };
