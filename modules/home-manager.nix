@@ -141,10 +141,15 @@ in
     };
 
     agentsMd = mkOption {
-      type = types.str;
+      type = types.lines;
       default = "";
       description = ''
         Contents of `~/.codex/AGENTS.md`. Written only if non-empty.
+
+        `types.lines` rather than `types.str` so several modules can each
+        contribute a section: a shared cross-agent instruction module and a
+        host-specific one both setting this would be a definition conflict
+        under `str`, where `lines` concatenates them with a newline between.
       '';
     };
   };
