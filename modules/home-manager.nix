@@ -66,8 +66,18 @@ let
   # User top-level servers win over plugin-collected ones on a name conflict.
   allMcpServers = collectedMcpServers // cfg.mcpServers;
 
+  # Codex >= 0.157 routes the TUI through a background app-server daemon that
+  # copies the running CLI's package into ~/.codex/packages and then
+  # self-updates it from the standalone installer. A Nix store build has no
+  # such package ("this CLI has no complete local package"), and a
+  # self-updating copy outside the store would bypass `package` anyway, so
+  # run embedded unless `settings` opts back in.
+  defaultSettings = {
+    features.daemon_auto_start = false;
+  };
+
   # Merge settings with all MCP servers (plugins + user option) and agent roles.
-  mergedSettings = lib.recursiveUpdate cfg.settings (
+  mergedSettings = lib.recursiveUpdate (lib.recursiveUpdate defaultSettings cfg.settings) (
     (optionalAttrs (allMcpServers != { }) { mcp_servers = allMcpServers; })
     // (optionalAttrs (agentRoles != { }) { agents = agentRoles; })
   );

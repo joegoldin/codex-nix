@@ -20,6 +20,11 @@ programs.codex-nix = {
 `config.toml` is reconciled on activation via a `yj`/`jq` deep-merge, so
 user-managed keys survive rebuilds; generated keys win on conflict.
 
+`features.daemon_auto_start` defaults to `false`. Codex's background
+app-server daemon needs a packaged CLI layout that a Nix store build does not
+provide, and it self-updates outside the store. Set
+`settings.features.daemon_auto_start = true` to opt back in.
+
 ### MCP servers
 
 `programs.codex-nix.mcpServers` merges into the `[mcp_servers.*]` tables of
