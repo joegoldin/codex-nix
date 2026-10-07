@@ -85,8 +85,11 @@ let
   # Generate config TOML file.
   configToml = tomlFormat.generate "codex-nix-config.toml" mergedSettings;
 
-  # Generate hooks JSON file.
-  hooksJson = pkgs.writeText "codex-nix-hooks.json" (builtins.toJSON collectedHooks);
+  # Generate hooks JSON file. Codex >= 0.160 rejects a bare event map; events
+  # must sit under a top-level `hooks` key.
+  hooksJson = pkgs.writeText "codex-nix-hooks.json" (
+    builtins.toJSON { hooks = collectedHooks; }
+  );
 
 in
 {
@@ -200,7 +203,13 @@ in
 
       if [[ -f "$hooksFile" ]]; then
         tmpFile=$(mktemp)
-        ${lib.getExe pkgs.jq} -s '.[0] * .[1]' "$hooksFile" "$generatedHooks" > "$tmpFile"
+        # Fold any top-level event keys left by the pre-0.160 flat layout
+        # under `hooks` before merging, or Codex rejects the whole file.
+        ${lib.getExe pkgs.jq} -s '
+          (.[0] | with_entries(select(.key == "description"))
+            + { hooks: ((.hooks // { }) * del(.hooks, .description)) })
+          * .[1]
+        ' "$hooksFile" "$generatedHooks" > "$tmpFile"
         run mv "$tmpFile" "$hooksFile"
       else
         run cp "$generatedHooks" "$hooksFile"
